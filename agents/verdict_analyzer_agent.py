@@ -1,5 +1,8 @@
+import logging
 from datetime import datetime
 from config.settings import config
+
+logger = logging.getLogger("soc.verdict_analyzer")
 
 SENSITIVE_DEPARTMENTS = {"IT", "Security"}
 
@@ -9,7 +12,7 @@ class VerdictAnalyzerAgent:
         self.verdicts = []
         self.tasks_completed = 0
         self.errors = 0
-        print("[Verdict Analyzer] Initialized")
+        logger.info("Verdict Analyzer initialized")
 
     def analyze_and_verdict(self, investigation_id, evidence_items, alert_data):
         try:

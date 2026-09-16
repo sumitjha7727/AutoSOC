@@ -20,6 +20,8 @@
             <button class="tab-button active" onclick="switchTab('dashboard')">Dashboard</button>
             <button class="tab-button" onclick="switchTab('investigations')">Investigations</button>
             <button class="tab-button" onclick="switchTab('escalations')">Escalations</button>
+            <button class="tab-button" onclick="switchTab('resolved')">Resolved</button>
+            <button class="tab-button" onclick="switchTab('reviews')">Reviews</button>
             <button class="tab-button" onclick="switchTab('metrics')">Metrics</button>
         </div>
 
@@ -34,7 +36,7 @@
                     <select id="alertDropdown" onchange="updateAlertInfo()">
                         <option value="">-- Select Alert --</option>
                     </select>
-                    <button class="btn" onclick="startInvestigation()">Start Investigation</button>
+                    <button id="startInvestigationBtn" class="btn" onclick="startInvestigation()">Start Investigation</button>
                 </div>
             </div>
 
@@ -128,7 +130,67 @@
         </div>
 
         <!-- ============================================ -->
-        <!-- TAB 4: METRICS -->
+        <!-- TAB 4: RESOLVED -->
+        <!-- ============================================ -->
+        <div id="resolved" class="tab-content">
+            <div class="section">
+                <h2>Resolved Incidents</h2>
+
+                <!-- Resolved Table -->
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Investigation ID</th>
+                                <th>Alert ID</th>
+                                <th>Alert Type</th>
+                                <th>Verdict</th>
+                                <th>Resolution Reason</th>
+                                <th>Resolved At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resolvedTable">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: #999;">Loading resolved incidents...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- TAB 5: REVIEWS -->
+        <!-- ============================================ -->
+        <div id="reviews" class="tab-content">
+            <div class="section">
+                <h2>Requested Reviews</h2>
+
+                <!-- Reviews Table -->
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Investigation ID</th>
+                                <th>Alert ID</th>
+                                <th>Alert Type</th>
+                                <th>Verdict</th>
+                                <th>Review Reason</th>
+                                <th>Requested At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reviewsTable">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: #999;">Loading review requests...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- TAB 6: METRICS -->
         <!-- ============================================ -->
         <div id="metrics" class="tab-content">
             <div class="section">
@@ -205,9 +267,9 @@
 
             <!-- Action Buttons -->
             <div class="modal-buttons">
-                <button class="escalate" onclick="escalateIncident()">Escalate</button>
-                <button class="resolve" onclick="markResolved()">Mark Resolved</button>
-                <button class="review" onclick="requestReview()">Request Review</button>
+                <button class="escalate" onclick="escalateIncident(this)">Escalate</button>
+                <button class="resolve" onclick="markResolved(this)">Mark Resolved</button>
+                <button class="review" onclick="requestReview(this)">Request Review</button>
                 <button class="close-btn" onclick="closeModal()">Close</button>
             </div>
         </div>

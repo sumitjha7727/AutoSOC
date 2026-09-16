@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAllAlerts();
     loadAllInvestigations();
     loadAllEscalations();
+    loadAllResolved();
+    loadAllReviews();
     loadMetrics();
 });
 
@@ -35,6 +37,10 @@ function switchTab(tabName) {
         loadAllInvestigations();
     } else if (tabName === 'escalations') {
         loadAllEscalations();
+    } else if (tabName === 'resolved') {
+        loadAllResolved();
+    } else if (tabName === 'reviews') {
+        loadAllReviews();
     } else if (tabName === 'metrics') {
         loadMetrics();
     }
@@ -78,26 +84,45 @@ function updateAlertInfo() {
 }
 
 // ============================================================
-// START INVESTIGATION
+// START INVESTIGATION (streams live progress via Socket.IO)
 // ============================================================
+let investigationInProgress = false;
+
+function resetStartButton() {
+    investigationInProgress = false;
+    const startBtn = document.getElementById('startInvestigationBtn');
+    startBtn.disabled = false;
+    startBtn.textContent = 'Start Investigation';
+}
+
 async function startInvestigation() {
     const dropdown = document.getElementById('alertDropdown');
-    
+    const startBtn = document.getElementById('startInvestigationBtn');
+
     if (!dropdown.value) {
         alert('Please select an alert first!');
         return;
     }
-    
+
+    if (investigationInProgress) {
+        return; // guard against double-submission while one is already running
+    }
+
     const alertData = JSON.parse(dropdown.value);
-    
+    const statusBox = document.getElementById('statusBox');
+    const resultsBox = document.getElementById('resultsBox');
+
+    investigationInProgress = true;
+    startBtn.disabled = true;
+    startBtn.textContent = 'Investigating...';
+    statusBox.innerHTML = '<p><span class="loading"></span> Investigation started...</p><ul id="progressLog"></ul>';
+    statusBox.classList.add('pending');
+    statusBox.classList.remove('error');
+    resultsBox.innerHTML = '';
+
     try {
-        // Show loading state
-        const statusBox = document.getElementById('statusBox');
-        statusBox.innerHTML = '<p><span class="loading"></span> Investigation in progress...</p>';
-        statusBox.classList.add('pending');
-        statusBox.classList.remove('error');
-        
-        // Call API to start investigation
+        // Call API to start investigation - returns immediately with just the ID;
+        // the actual pipeline runs in the background and streams progress below.
         const response = await fetch('/api/start-investigation', {
             method: 'POST',
             headers: {
@@ -105,28 +130,25 @@ async function startInvestigation() {
             },
             body: JSON.stringify(alertData)
         });
-        
+
         const result = await response.json();
-        
+
         if (response.ok) {
-            // Investigation started successfully
-            statusBox.innerHTML = `<p style="color: #51cf66;">Investigation complete! ID: ${result.investigation_id}</p>`;
-            statusBox.classList.remove('pending');
-            
-            // Load investigation details
-            setTimeout(() => {
-                loadInvestigationResults(result.investigation_id);
-                loadAllInvestigations();
-            }, 1000);
-            
+            window.currentInvestigationId = result.investigation_id;
+            loadAllInvestigations();
             console.log('[APP] Investigation started:', result);
+            // Further updates arrive via the investigation_progress / investigation_complete
+            // socket events handled below.
         } else {
             statusBox.innerHTML = `<p style="color: #ff6b6b;">Error: ${result.error}</p>`;
             statusBox.classList.add('error');
+            resetStartButton();
         }
     } catch (error) {
         console.error('[APP] Error starting investigation:', error);
-        document.getElementById('statusBox').innerHTML = `<p style="color: #ff6b6b;">Error: ${error.message}</p>`;
+        statusBox.innerHTML = `<p style="color: #ff6b6b;">Error: ${error.message}</p>`;
+        statusBox.classList.add('error');
+        resetStartButton();
     }
 }
 
@@ -204,6 +226,20 @@ async function viewDetails(investigationId) {
                 timelineEl.innerHTML = '<li>No timeline events recorded.</li>';
             }
 
+            // Disable Escalate if this investigation was already escalated (manually or
+            // automatically) - the button is a single DOM node reused across every
+            // investigation, so its state must be reset fresh on every open.
+            const escalateBtn = document.querySelector('.modal-buttons .escalate');
+            if (escalateBtn) {
+                if (investigation.escalated_at) {
+                    escalateBtn.textContent = 'Already Escalated';
+                    escalateBtn.disabled = true;
+                } else {
+                    escalateBtn.textContent = 'Escalate';
+                    escalateBtn.disabled = false;
+                }
+            }
+
             // Store investigation ID for action buttons
             window.currentInvestigationId = investigationId;
 
@@ -236,19 +272,19 @@ window.onclick = function(event) {
 // ============================================================
 // ESCALATE INCIDENT
 // ============================================================
-async function escalateIncident() {
+async function escalateIncident(btn) {
     const investigationId = window.currentInvestigationId;
-    
+
     if (!investigationId) {
         alert('No investigation selected');
         return;
     }
-    
+
     try {
         // Show loading state
-        event.target.textContent = 'Escalating...';
-        event.target.disabled = true;
-        
+        btn.textContent = 'Escalating...';
+        btn.disabled = true;
+
         const response = await fetch('/api/escalate-incident', {
             method: 'POST',
             headers: {
@@ -256,45 +292,45 @@ async function escalateIncident() {
             },
             body: JSON.stringify({ investigation_id: investigationId })
         });
-        
+
         const result = await response.json();
-        
+
         if (response.ok) {
             alert('Incident escalated successfully!');
             closeModal();
             loadAllEscalations(); // Refresh escalations list
+            loadAllInvestigations();
+            loadMetrics();
             console.log('[APP] Incident escalated:', result);
         } else {
             alert(`Error: ${result.error}`);
+            btn.textContent = 'Escalate';
+            btn.disabled = false;
         }
-        
-        // Reset button
-        event.target.textContent = 'Escalate';
-        event.target.disabled = false;
     } catch (error) {
         console.error('[APP] Error escalating incident:', error);
         alert(`Error: ${error.message}`);
-        event.target.textContent = 'Escalate';
-        event.target.disabled = false;
+        btn.textContent = 'Escalate';
+        btn.disabled = false;
     }
 }
 
 // ============================================================
 // MARK RESOLVED
 // ============================================================
-async function markResolved() {
+async function markResolved(btn) {
     const investigationId = window.currentInvestigationId;
-    
+
     if (!investigationId) {
         alert('No investigation selected');
         return;
     }
-    
+
     try {
         // Show loading state
-        event.target.textContent = 'Marking...';
-        event.target.disabled = true;
-        
+        btn.textContent = 'Marking...';
+        btn.disabled = true;
+
         const response = await fetch('/api/mark-resolved', {
             method: 'POST',
             headers: {
@@ -302,45 +338,48 @@ async function markResolved() {
             },
             body: JSON.stringify({ investigation_id: investigationId })
         });
-        
+
         const result = await response.json();
-        
+
         if (response.ok) {
             alert('Incident marked as resolved!');
             closeModal();
             loadAllInvestigations(); // Refresh investigations list
+            loadAllResolved();
+            loadMetrics();
             console.log('[APP] Incident marked resolved:', result);
         } else {
             alert(`Error: ${result.error}`);
         }
-        
-        // Reset button
-        event.target.textContent = 'Mark Resolved';
-        event.target.disabled = false;
+
+        // Always reset - unlike Escalate, resolving has no persisted "already done"
+        // state to preserve, so the button should be clickable again either way.
+        btn.textContent = 'Mark Resolved';
+        btn.disabled = false;
     } catch (error) {
         console.error('[APP] Error marking resolved:', error);
         alert(`Error: ${error.message}`);
-        event.target.textContent = 'Mark Resolved';
-        event.target.disabled = false;
+        btn.textContent = 'Mark Resolved';
+        btn.disabled = false;
     }
 }
 
 // ============================================================
 // REQUEST REVIEW
 // ============================================================
-async function requestReview() {
+async function requestReview(btn) {
     const investigationId = window.currentInvestigationId;
-    
+
     if (!investigationId) {
         alert('No investigation selected');
         return;
     }
-    
+
     try {
         // Show loading state
-        event.target.textContent = 'Requesting...';
-        event.target.disabled = true;
-        
+        btn.textContent = 'Requesting...';
+        btn.disabled = true;
+
         const response = await fetch('/api/request-review', {
             method: 'POST',
             headers: {
@@ -348,25 +387,26 @@ async function requestReview() {
             },
             body: JSON.stringify({ investigation_id: investigationId })
         });
-        
+
         const result = await response.json();
-        
+
         if (response.ok) {
             alert('Review requested successfully!');
             closeModal();
+            loadAllReviews();
             console.log('[APP] Review requested:', result);
         } else {
             alert(`Error: ${result.error}`);
         }
-        
-        // Reset button
-        event.target.textContent = 'Request Review';
-        event.target.disabled = false;
+
+        // Always reset - Request Review has no persisted "already done" state either.
+        btn.textContent = 'Request Review';
+        btn.disabled = false;
     } catch (error) {
         console.error('[APP] Error requesting review:', error);
         alert(`Error: ${error.message}`);
-        event.target.textContent = 'Request Review';
-        event.target.disabled = false;
+        btn.textContent = 'Request Review';
+        btn.disabled = false;
     }
 }
 
@@ -454,6 +494,70 @@ async function loadAllEscalations() {
 }
 
 // ============================================================
+// LOAD ALL RESOLVED INCIDENTS
+// ============================================================
+async function loadAllResolved() {
+    try {
+        const response = await fetch('/api/resolved');
+        const resolved = await response.json();
+
+        const tbody = document.getElementById('resolvedTable');
+
+        if (resolved.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No resolved incidents yet</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = resolved.map(r => `
+            <tr>
+                <td>${r.investigation_id}</td>
+                <td>${r.alert_id}</td>
+                <td>${r.alert_type || '-'}</td>
+                <td>${r.verdict || '-'}</td>
+                <td>${r.resolution_reason || '-'}</td>
+                <td>${new Date(r.resolved_at).toLocaleString()}</td>
+            </tr>
+        `).join('');
+
+        console.log(`[APP] Loaded ${resolved.length} resolved incidents`);
+    } catch (error) {
+        console.error('[APP] Error loading resolved incidents:', error);
+    }
+}
+
+// ============================================================
+// LOAD ALL REVIEW REQUESTS
+// ============================================================
+async function loadAllReviews() {
+    try {
+        const response = await fetch('/api/reviews');
+        const reviews = await response.json();
+
+        const tbody = document.getElementById('reviewsTable');
+
+        if (reviews.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #999;">No review requests yet</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = reviews.map(rv => `
+            <tr>
+                <td>${rv.investigation_id}</td>
+                <td>${rv.alert_id}</td>
+                <td>${rv.alert_type || '-'}</td>
+                <td>${rv.verdict || '-'}</td>
+                <td>${rv.review_reason || '-'}</td>
+                <td>${new Date(rv.reviewed_at).toLocaleString()}</td>
+            </tr>
+        `).join('');
+
+        console.log(`[APP] Loaded ${reviews.length} review requests`);
+    } catch (error) {
+        console.error('[APP] Error loading review requests:', error);
+    }
+}
+
+// ============================================================
 // LOAD METRICS
 // ============================================================
 async function loadMetrics() {
@@ -485,6 +589,38 @@ socket.on('investigation_started', function(data) {
     loadAllInvestigations();
 });
 
+socket.on('investigation_progress', function(data) {
+    if (data.investigation_id !== window.currentInvestigationId) return;
+    const log = document.getElementById('progressLog');
+    if (log) {
+        const li = document.createElement('li');
+        li.textContent = `[${data.agent_name}] ${data.description}`;
+        log.appendChild(li);
+    }
+    console.log('[SocketIO] Progress:', data);
+});
+
+socket.on('investigation_complete', function(data) {
+    if (data.investigation_id !== window.currentInvestigationId) return;
+
+    const statusBox = document.getElementById('statusBox');
+    if (data.success) {
+        statusBox.innerHTML = `<p style="color: #51cf66;">Investigation complete! ID: ${data.investigation_id}</p>`;
+        statusBox.classList.remove('pending');
+        loadInvestigationResults(data.investigation_id);
+    } else {
+        statusBox.innerHTML = `<p style="color: #ff6b6b;">Error: ${data.error || 'Investigation failed'}</p>`;
+        statusBox.classList.add('error');
+    }
+
+    resetStartButton();
+    loadAllInvestigations();
+    loadAllEscalations();
+    loadMetrics();
+
+    console.log('[SocketIO] Investigation complete:', data);
+});
+
 socket.on('incident_escalated', function(data) {
     console.log('[SocketIO] Incident escalated:', data);
     loadAllEscalations();
@@ -494,11 +630,13 @@ socket.on('incident_escalated', function(data) {
 socket.on('incident_resolved', function(data) {
     console.log('[SocketIO] Incident resolved:', data);
     loadAllInvestigations();
+    loadAllResolved();
     loadMetrics();
 });
 
 socket.on('review_requested', function(data) {
     console.log('[SocketIO] Review requested:', data);
+    loadAllReviews();
 });
 
 socket.on('disconnect', function() {

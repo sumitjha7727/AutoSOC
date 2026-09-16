@@ -5,7 +5,6 @@ Multi-Agent Orchestration System for Security Operations Center
 import os
 import sys
 import json
-import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -15,22 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Import configuration
 from config.settings import config
 from utils.database import init_db, get_investigation
-
-# Setup logging
-def setup_logging():
-    """Configure logging for the application"""
-    log_dir = Path("./logs")
-    log_dir.mkdir(exist_ok=True)
-    
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler("./logs/soc_automation.log"),
-            logging.StreamHandler()
-        ]
-    )
-    return logging.getLogger(__name__)
+from utils.logging_config import setup_logging
 
 logger = setup_logging()
 

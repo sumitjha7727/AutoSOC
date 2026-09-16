@@ -38,5 +38,45 @@
     "affected_user": "sarah.wilson@company.com",
     "source_ip": "203.0.113.45",
     "timestamp": "2026-09-09T14:31:00Z"
+  },
+  {
+    "alert_id": "ALT-20260909-006",
+    "alert_type": "BRUTE_FORCE_ATTACK",
+    "severity": "HIGH",
+    "affected_user": "robert.chen@company.com",
+    "source_ip": "185.220.101.13",
+    "timestamp": "2026-09-09T14:35:00Z"
+  },
+  {
+    "alert_id": "ALT-20260909-007",
+    "alert_type": "DNS_TUNNELING",
+    "severity": "HIGH",
+    "affected_user": "priya.nair@company.com",
+    "source_ip": "192.168.2.44",
+    "timestamp": "2026-09-09T14:40:00Z"
+  },
+  {
+    "alert_id": "ALT-20260909-008",
+    "alert_type": "RANSOMWARE_ACTIVITY",
+    "severity": "CRITICAL",
+    "affected_user": "emma.davis@company.com",
+    "source_ip": "91.243.85.22",
+    "timestamp": "2026-09-09T14:45:00Z"
+  },
+  {
+    "alert_id": "ALT-20260909-009",
+    "alert_type": "PHISHING_LINK_CLICKED",
+    "severity": "MEDIUM",
+    "affected_user": "james.wilson@company.com",
+    "source_ip": "45.155.204.9",
+    "timestamp": "2026-09-09T14:50:00Z"
+  },
+  {
+    "alert_id": "ALT-20260909-010",
+    "alert_type": "PORT_SCAN_DETECTED",
+    "severity": "LOW",
+    "affected_user": "kevin.park@company.com",
+    "source_ip": "10.0.7.19",
+    "timestamp": "2026-09-09T14:55:00Z"
   }
 ]

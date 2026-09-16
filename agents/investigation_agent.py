@@ -1,4 +1,7 @@
+import logging
 from datetime import datetime
+
+logger = logging.getLogger("soc.investigation_agent")
 
 SEVERE_ALERT_TYPES = {"MALWARE_DETECTED", "PRIVILEGE_ESCALATION_ATTEMPT"}
 
@@ -8,7 +11,7 @@ class InvestigationAgent:
         self.investigation_data = {}
         self.tasks_completed = 0
         self.errors = 0
-        print("[Investigation Agent] Initialized")
+        logger.info("Investigation Agent initialized")
 
     def conduct_investigation(self, investigation_id, alert_data, evidence_list):
         """Simulate contacting the affected user / manager for confirmation, using the

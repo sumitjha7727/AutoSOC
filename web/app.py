@@ -7,12 +7,15 @@ import sys
 # Add parent directory to path to import utils
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from utils.logging_config import setup_logging
 from utils.database import (
     init_db, get_investigation_details, save_escalation,
-    get_escalations, save_review, save_resolved, get_metrics,
-    get_all_investigations
+    get_escalations, save_review, get_reviews, save_resolved, get_resolved,
+    get_metrics, get_all_investigations
 )
 from agents.orchestrator_agent import orchestrator
+
+logger = setup_logging()
 
 # Initialize Flask app
 app = Flask(__name__, template_folder='templates', static_folder='static')
@@ -34,12 +37,12 @@ def load_mock_data(path):
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
     except Exception as e:
-        print(f"[APP] Error loading {path}: {e}")
+        logger.error(f"[APP] Error loading {path}: {e}")
     return {}
 
 mock_alerts = load_mock_data(MOCK_ALERTS_PATH)
 
-print("[APP] Mock data loaded successfully")
+logger.info("[APP] Mock data loaded successfully")
 
 # ============================================================
 # ROUTES
@@ -70,7 +73,7 @@ def get_alerts():
         else:
             return jsonify([])
     except Exception as e:
-        print(f"[APP] Error in get_alerts: {e}")
+        logger.error(f"[APP] Error in get_alerts: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================================
@@ -84,7 +87,7 @@ def get_investigations():
         investigations = get_all_investigations()
         return jsonify(investigations)
     except Exception as e:
-        print(f"[APP] Error in get_investigations: {e}")
+        logger.error(f"[APP] Error in get_investigations: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/investigation-details/<investigation_id>', methods=['GET'])
@@ -97,39 +100,49 @@ def get_investigation_details_route(investigation_id):
         else:
             return jsonify({'error': 'Investigation not found'}), 404
     except Exception as e:
-        print(f"[APP] Error in get_investigation_details: {e}")
+        logger.error(f"[APP] Error in get_investigation_details: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/start-investigation', methods=['POST'])
 def start_investigation():
-    """Start a new investigation - runs the full agent orchestration pipeline"""
+    """Start a new investigation. Creates the investigation record synchronously (fast)
+    and returns its ID immediately, then runs the rest of the agent pipeline in a
+    background task, streaming progress over Socket.IO as each step completes."""
     try:
         alert_data = request.json
 
-        result = orchestrator.orchestrate_investigation(alert_data)
+        investigation_id = orchestrator.start_investigation(alert_data)
+        if not investigation_id:
+            return jsonify({'error': 'Failed to create investigation'}), 500
 
-        if not result.get('success'):
-            return jsonify({'error': result.get('error', 'Investigation failed')}), 500
+        def on_step(event):
+            socketio.emit('investigation_progress', event)
 
-        investigation_id = result['investigation_id']
+        def run():
+            with app.app_context():
+                result = orchestrator.run_investigation(investigation_id, alert_data, on_step=on_step)
+                socketio.emit('investigation_complete', {
+                    'investigation_id': investigation_id,
+                    'alert_id': alert_data.get('alert_id'),
+                    'success': result.get('success'),
+                    'verdict': result.get('verdict'),
+                    'confidence': result.get('verdict_confidence'),
+                    'risk_score': result.get('risk_score'),
+                    'error': result.get('error'),
+                })
 
-        # Emit event to all connected clients
+        socketio.start_background_task(run)
+
         socketio.emit('investigation_started', {
             'investigation_id': investigation_id,
-            'alert_id': result.get('alert_id'),
-            'verdict': result.get('verdict')
-        }, skip_sid=None)
-
-        print(f"[APP] Investigation started: {investigation_id}")
-
-        return jsonify({
-            'investigation_id': investigation_id,
-            'verdict': result.get('verdict'),
-            'confidence': result.get('verdict_confidence'),
-            'risk_score': result.get('risk_score')
+            'alert_id': alert_data.get('alert_id'),
         })
+
+        logger.info(f"[APP] Investigation started: {investigation_id}")
+
+        return jsonify({'investigation_id': investigation_id, 'status': 'started'})
     except Exception as e:
-        print(f"[APP] Error in start_investigation: {e}")
+        logger.error(f"[APP] Error in start_investigation: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================================
@@ -143,7 +156,7 @@ def get_escalations_route():
         escalations = get_escalations()
         return jsonify(escalations)
     except Exception as e:
-        print(f"[APP] Error in get_escalations: {e}")
+        logger.error(f"[APP] Error in get_escalations: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/escalate-incident', methods=['POST'])
@@ -152,16 +165,19 @@ def escalate_incident():
     try:
         data = request.json
         investigation_id = data.get('investigation_id')
-        
+
         if not investigation_id:
             return jsonify({'error': 'Investigation ID required'}), 400
-        
+
         # Get investigation details
         investigation = get_investigation_details(investigation_id)
-        
+
         if not investigation:
             return jsonify({'error': 'Investigation not found'}), 404
-        
+
+        if investigation.get('escalated_at'):
+            return jsonify({'error': 'Investigation already escalated'}), 409
+
         # Save escalation
         save_escalation(
             investigation_id,
@@ -170,22 +186,22 @@ def escalate_incident():
             investigation['confidence'],
             investigation['risk_score']
         )
-        
+
         # Emit event to all connected clients for real-time update
         socketio.emit('incident_escalated', {
             'investigation_id': investigation_id,
             'alert_id': investigation['alert_id'],
             'verdict': investigation['verdict']
         }, skip_sid=None)
-        
-        print(f"[APP] Incident escalated: {investigation_id}")
-        
+
+        logger.info(f"[APP] Incident escalated: {investigation_id}")
+
         return jsonify({
             'success': True,
             'message': 'Incident escalated successfully'
         })
     except Exception as e:
-        print(f"[APP] Error in escalate_incident: {e}")
+        logger.error(f"[APP] Error in escalate_incident: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================================
@@ -198,33 +214,43 @@ def mark_resolved():
     try:
         data = request.json
         investigation_id = data.get('investigation_id')
-        
+
         if not investigation_id:
             return jsonify({'error': 'Investigation ID required'}), 400
-        
+
         # Get investigation details
         investigation = get_investigation_details(investigation_id)
-        
+
         if not investigation:
             return jsonify({'error': 'Investigation not found'}), 404
-        
+
         # Save resolved status
         save_resolved(investigation_id, investigation['alert_id'], 'Manual resolution')
-        
+
         # Emit event for real-time update
         socketio.emit('incident_resolved', {
             'investigation_id': investigation_id,
             'alert_id': investigation['alert_id']
         }, skip_sid=None)
-        
-        print(f"[APP] Incident marked resolved: {investigation_id}")
-        
+
+        logger.info(f"[APP] Incident marked resolved: {investigation_id}")
+
         return jsonify({
             'success': True,
             'message': 'Incident marked as resolved'
         })
     except Exception as e:
-        print(f"[APP] Error in mark_resolved: {e}")
+        logger.error(f"[APP] Error in mark_resolved: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/resolved', methods=['GET'])
+def get_resolved_route():
+    """Get all resolved incidents"""
+    try:
+        resolved = get_resolved()
+        return jsonify(resolved)
+    except Exception as e:
+        logger.error(f"[APP] Error in get_resolved: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/request-review', methods=['POST'])
@@ -233,33 +259,43 @@ def request_review_route():
     try:
         data = request.json
         investigation_id = data.get('investigation_id')
-        
+
         if not investigation_id:
             return jsonify({'error': 'Investigation ID required'}), 400
-        
+
         # Get investigation details
         investigation = get_investigation_details(investigation_id)
-        
+
         if not investigation:
             return jsonify({'error': 'Investigation not found'}), 404
-        
+
         # Save review request
         save_review(investigation_id, investigation['alert_id'], 'Manual review requested')
-        
+
         # Emit event for real-time update
         socketio.emit('review_requested', {
             'investigation_id': investigation_id,
             'alert_id': investigation['alert_id']
         }, skip_sid=None)
-        
-        print(f"[APP] Review requested: {investigation_id}")
-        
+
+        logger.info(f"[APP] Review requested: {investigation_id}")
+
         return jsonify({
             'success': True,
             'message': 'Review requested successfully'
         })
     except Exception as e:
-        print(f"[APP] Error in request_review: {e}")
+        logger.error(f"[APP] Error in request_review: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reviews', methods=['GET'])
+def get_reviews_route():
+    """Get all review requests"""
+    try:
+        reviews = get_reviews()
+        return jsonify(reviews)
+    except Exception as e:
+        logger.error(f"[APP] Error in get_reviews: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================================
@@ -273,7 +309,7 @@ def get_metrics_route():
         metrics = get_metrics()
         return jsonify(metrics)
     except Exception as e:
-        print(f"[APP] Error in get_metrics: {e}")
+        logger.error(f"[APP] Error in get_metrics: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================================
@@ -283,13 +319,13 @@ def get_metrics_route():
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection"""
-    print('[SocketIO] Client connected')
+    logger.info('[SocketIO] Client connected')
     emit('response', {'data': 'Connected to SOC Dashboard'})
 
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle client disconnection"""
-    print('[SocketIO] Client disconnected')
+    logger.info('[SocketIO] Client disconnected')
 
 # ============================================================
 # ERROR HANDLERS
@@ -310,6 +346,6 @@ def internal_error(error):
 # ============================================================
 
 if __name__ == '__main__':
-    print("[APP] Starting SOC Alert Automation Dashboard")
-    print("[APP] Navigate to http://127.0.0.1:5000")
+    logger.info("[APP] Starting SOC Alert Automation Dashboard")
+    logger.info("[APP] Navigate to http://127.0.0.1:5000")
     socketio.run(app, debug=True, host='127.0.0.1', port=5000)

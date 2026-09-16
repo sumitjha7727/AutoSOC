@@ -1,10 +1,13 @@
+import logging
 from datetime import datetime
+
+logger = logging.getLogger("soc.health_monitor")
 
 
 class HealthMonitorAgent:
     def __init__(self):
         self.step_timings = {}
-        print("[Health Monitor] Initialized")
+        logger.info("Health Monitor initialized")
 
     def record_step(self, agent_name, duration_ms, success=True):
         stats = self.step_timings.setdefault(agent_name, {"calls": 0, "errors": 0, "total_ms": 0.0, "last_ms": 0.0})

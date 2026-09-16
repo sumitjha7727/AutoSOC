@@ -1,10 +1,18 @@
+import logging
 from datetime import datetime
+
+logger = logging.getLogger("soc.evidence_gatherer")
 
 # Suspicious log event types the Verdict Analyzer treats as red flags
 FLAGGED_LOG_EVENTS = {
     "MALICIOUS_PROCESS_EXECUTED", "SUSPICIOUS_OUTBOUND_CONNECTION", "FILE_QUARANTINED",
     "LARGE_DATA_TRANSFER", "UNUSUAL_PORT_ACTIVITY", "SUDO_ATTEMPT_FAILED",
     "UNAUTHORIZED_ACCESS_ATTEMPT", "ADMIN_GROUP_MODIFIED",
+    "ACCOUNT_LOCKOUT_TRIGGERED", "SUSPICIOUS_LOGIN_PATTERN",
+    "EXCESSIVE_DNS_QUERY_VOLUME", "SUSPICIOUS_DNS_SUBDOMAIN_PATTERN", "BEACONING_INTERVAL_DETECTED",
+    "MASS_FILE_ENCRYPTION_DETECTED", "RANSOM_NOTE_CREATED", "SHADOW_COPY_DELETION_ATTEMPT",
+    "MALICIOUS_LINK_CLICKED", "CREDENTIAL_ENTERED_ON_EXTERNAL_SITE",
+    "SEQUENTIAL_PORT_PROBE_DETECTED",
 }
 
 # Representative mock log patterns per alert type, tied to the affected user
@@ -34,6 +42,28 @@ LOG_PATTERNS = {
         {"event_type": "FILE_ACCESS", "timestamp": "2026-09-09 14:32:00", "user": user, "file": "quarterly_report.xlsx"},
         {"event_type": "LOGOUT", "timestamp": "2026-09-09 15:02:00", "user": user},
     ],
+    "BRUTE_FORCE_ATTACK": lambda user: [
+        {"event_type": "FAILED_LOGIN", "timestamp": "2026-09-09 14:35:00", "user": user, "attempts": 47},
+        {"event_type": "ACCOUNT_LOCKOUT_TRIGGERED", "timestamp": "2026-09-09 14:35:30", "user": user},
+        {"event_type": "SUSPICIOUS_LOGIN_PATTERN", "timestamp": "2026-09-09 14:35:45", "user": user, "unique_source_ips": 1},
+    ],
+    "DNS_TUNNELING": lambda user: [
+        {"event_type": "EXCESSIVE_DNS_QUERY_VOLUME", "timestamp": "2026-09-09 14:40:00", "user": user, "queries_per_minute": 850},
+        {"event_type": "SUSPICIOUS_DNS_SUBDOMAIN_PATTERN", "timestamp": "2026-09-09 14:40:10", "user": user, "domain": "a8f3d1.datax-sync.net"},
+        {"event_type": "BEACONING_INTERVAL_DETECTED", "timestamp": "2026-09-09 14:40:20", "user": user, "interval_seconds": 60},
+    ],
+    "RANSOMWARE_ACTIVITY": lambda user: [
+        {"event_type": "MASS_FILE_ENCRYPTION_DETECTED", "timestamp": "2026-09-09 14:45:00", "user": user, "files_encrypted": 4213},
+        {"event_type": "RANSOM_NOTE_CREATED", "timestamp": "2026-09-09 14:45:05", "user": user, "file": "README_DECRYPT.txt"},
+        {"event_type": "SHADOW_COPY_DELETION_ATTEMPT", "timestamp": "2026-09-09 14:45:10", "user": user},
+    ],
+    "PHISHING_LINK_CLICKED": lambda user: [
+        {"event_type": "MALICIOUS_LINK_CLICKED", "timestamp": "2026-09-09 14:50:00", "user": user, "url": "hxxp://secure-office365-login.net"},
+        {"event_type": "CREDENTIAL_ENTERED_ON_EXTERNAL_SITE", "timestamp": "2026-09-09 14:50:15", "user": user},
+    ],
+    "PORT_SCAN_DETECTED": lambda user: [
+        {"event_type": "SEQUENTIAL_PORT_PROBE_DETECTED", "timestamp": "2026-09-09 14:55:00", "user": user, "ports_scanned": 24, "target_range": "10.0.7.0/24"},
+    ],
 }
 
 # Deterministic mock geolocation lookup, keyed by IP
@@ -43,6 +73,11 @@ IP_GEO_LOOKUP = {
     "10.0.1.50": {"country": "Internal", "city": "Internal Network"},
     "172.16.0.25": {"country": "Internal", "city": "Internal Network"},
     "203.0.113.45": {"country": "USA", "city": "Headquarters"},
+    "185.220.101.13": {"country": "Russia", "city": "Moscow"},
+    "192.168.2.44": {"country": "Internal", "city": "Internal Network"},
+    "91.243.85.22": {"country": "Romania", "city": "Bucharest"},
+    "45.155.204.9": {"country": "Netherlands", "city": "Amsterdam"},
+    "10.0.7.19": {"country": "Internal", "city": "Internal Network"},
 }
 
 
@@ -68,7 +103,7 @@ class EvidenceGathererAgent:
         self.evidence_collected = []
         self.tasks_completed = 0
         self.errors = 0
-        print("[Evidence Gatherer] Initialized")
+        logger.info("Evidence Gatherer initialized")
 
     def gather_all_evidence(self, investigation_id, alert_data, ip_verdicts, user_baseline):
         try:
@@ -86,7 +121,7 @@ class EvidenceGathererAgent:
             return evidence_list
         except Exception as e:
             self.errors += 1
-            print(f"[Evidence Gatherer] Error: {e}")
+            logger.error(f"Error: {e}")
             return []
 
     def _analyze_logs(self, alert_data):

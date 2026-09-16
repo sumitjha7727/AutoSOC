@@ -39,5 +39,46 @@
       "Headquarters"
     ],
     "never_accessed_from_countries": []
+  },
+  "robert.chen@company.com": {
+    "department": "Finance",
+    "typical_login_locations": [
+      "Chicago"
+    ],
+    "never_accessed_from_countries": [
+      "Russia"
+    ]
+  },
+  "priya.nair@company.com": {
+    "department": "Engineering",
+    "typical_login_locations": [
+      "San Francisco"
+    ],
+    "never_accessed_from_countries": [
+      "Russia"
+    ]
+  },
+  "emma.davis@company.com": {
+    "department": "Legal",
+    "typical_login_locations": [
+      "New York"
+    ],
+    "never_accessed_from_countries": [
+      "Romania"
+    ]
+  },
+  "james.wilson@company.com": {
+    "department": "Sales",
+    "typical_login_locations": [
+      "Dallas"
+    ],
+    "never_accessed_from_countries": []
+  },
+  "kevin.park@company.com": {
+    "department": "IT",
+    "typical_login_locations": [
+      "Headquarters"
+    ],
+    "never_accessed_from_countries": []
   }
 }

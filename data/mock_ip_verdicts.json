@@ -23,5 +23,30 @@
     "threat_level": "LOW",
     "reputation_score": 15,
     "abuse_reports": 0
+  },
+  "185.220.101.13": {
+    "threat_level": "CRITICAL",
+    "reputation_score": 95,
+    "abuse_reports": 40
+  },
+  "192.168.2.44": {
+    "threat_level": "MEDIUM",
+    "reputation_score": 50,
+    "abuse_reports": 3
+  },
+  "91.243.85.22": {
+    "threat_level": "CRITICAL",
+    "reputation_score": 98,
+    "abuse_reports": 60
+  },
+  "45.155.204.9": {
+    "threat_level": "MEDIUM",
+    "reputation_score": 55,
+    "abuse_reports": 12
+  },
+  "10.0.7.19": {
+    "threat_level": "LOW",
+    "reputation_score": 20,
+    "abuse_reports": 1
   }
 }

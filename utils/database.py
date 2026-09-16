@@ -1,5 +1,6 @@
 import sqlite3
 import json
+import logging
 import uuid
 from contextlib import closing
 from datetime import datetime
@@ -7,6 +8,8 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).parent.parent / 'data' / 'soc_automation.db'
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+logger = logging.getLogger("soc.database")
 
 
 def _connect():
@@ -34,6 +37,7 @@ def init_db():
                 confidence REAL,
                 risk_score REAL,
                 reasoning TEXT,
+                escalated_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 completed_at TIMESTAMP
             )
@@ -111,10 +115,10 @@ def init_db():
             )
             ''')
 
-        print("[DB] Database initialized successfully")
+        logger.info("Database initialized successfully")
         return True
     except Exception as e:
-        print(f"[DB] Error initializing database: {e}")
+        logger.error(f"Error initializing database: {e}")
         return False
 
 
@@ -138,10 +142,10 @@ def create_investigation(alert_data):
                 'PENDING',
                 datetime.now().isoformat()
             ))
-        print(f"[DB] Investigation created: {investigation_id}")
+        logger.info(f"Investigation created: {investigation_id}")
         return investigation_id
     except Exception as e:
-        print(f"[DB] Error creating investigation: {e}")
+        logger.error(f"Error creating investigation: {e}")
         return None
 
 
@@ -156,7 +160,7 @@ def save_evidence(investigation_id, evidence_type, data):
             ''', (investigation_id, evidence_type, json.dumps(data)))
         return True
     except Exception as e:
-        print(f"[DB] Error saving evidence: {e}")
+        logger.error(f"Error saving evidence: {e}")
         return False
 
 
@@ -171,7 +175,7 @@ def save_timeline_event(investigation_id, event_type, description, agent_name):
             ''', (investigation_id, event_type, description, agent_name))
         return True
     except Exception as e:
-        print(f"[DB] Error saving timeline event: {e}")
+        logger.error(f"Error saving timeline event: {e}")
         return False
 
 
@@ -189,10 +193,10 @@ def save_verdict(investigation_id, verdict, confidence, risk_score, reasoning):
             SET verdict = ?, confidence = ?, risk_score = ?, reasoning = ?, status = ?, completed_at = ?
             WHERE investigation_id = ?
             ''', (verdict, confidence, risk_score, reasoning, "COMPLETED", datetime.now().isoformat(), investigation_id))
-        print(f"[DB] Verdict saved for {investigation_id}: {verdict} (Status: COMPLETED)")
+        logger.info(f"Verdict saved for {investigation_id}: {verdict} (Status: COMPLETED)")
         return True
     except Exception as e:
-        print(f"[DB] Error saving verdict: {e}")
+        logger.error(f"Error saving verdict: {e}")
         return False
 
 
@@ -205,7 +209,7 @@ def get_investigation(investigation_id):
             row = cursor.fetchone()
         return dict(row) if row else None
     except Exception as e:
-        print(f"[DB] Error retrieving investigation: {e}")
+        logger.error(f"Error retrieving investigation: {e}")
         return None
 
 
@@ -218,7 +222,7 @@ def get_all_investigations():
             rows = cursor.fetchall()
         return [dict(row) for row in rows]
     except Exception as e:
-        print(f"[DB] Error retrieving investigations: {e}")
+        logger.error(f"Error retrieving investigations: {e}")
         return []
 
 
@@ -246,23 +250,35 @@ def get_investigation_details(investigation_id):
 
         return result
     except Exception as e:
-        print(f"[DB] Error retrieving investigation details: {e}")
+        logger.error(f"Error retrieving investigation details: {e}")
         return None
 
 
 def save_escalation(investigation_id, alert_id, verdict, confidence, risk_score, reason='Manual escalation from dashboard'):
-    """Save escalation record"""
+    """Save escalation record and mark the investigation as escalated. No-op (returns
+    False) if the investigation was already escalated, so this is safe to call both
+    automatically (on a TRUE_POSITIVE verdict) and manually from the dashboard without
+    ever creating duplicate escalation rows."""
     try:
         with closing(_connect()) as conn, conn:
             cursor = conn.cursor()
+            cursor.execute('SELECT escalated_at FROM investigations WHERE investigation_id = ?', (investigation_id,))
+            row = cursor.fetchone()
+            if row and row['escalated_at']:
+                logger.info(f"Escalation skipped for {investigation_id}: already escalated")
+                return False
+
             cursor.execute('''
             INSERT INTO escalations (investigation_id, alert_id, verdict, confidence, risk_score, escalation_reason)
             VALUES (?, ?, ?, ?, ?, ?)
             ''', (investigation_id, alert_id, verdict, confidence, risk_score, reason))
-        print(f"[DB] Escalation saved for {investigation_id}")
+            cursor.execute('''
+            UPDATE investigations SET escalated_at = ? WHERE investigation_id = ?
+            ''', (datetime.now().isoformat(), investigation_id))
+        logger.info(f"Escalation saved for {investigation_id}")
         return True
     except Exception as e:
-        print(f"[DB] Error saving escalation: {e}")
+        logger.error(f"Error saving escalation: {e}")
         return False
 
 
@@ -275,7 +291,7 @@ def get_escalations():
             rows = cursor.fetchall()
         return [dict(row) for row in rows]
     except Exception as e:
-        print(f"[DB] Error retrieving escalations: {e}")
+        logger.error(f"Error retrieving escalations: {e}")
         return []
 
 
@@ -288,11 +304,30 @@ def save_review(investigation_id, alert_id, review_reason):
             INSERT INTO reviews (investigation_id, alert_id, review_reason)
             VALUES (?, ?, ?)
             ''', (investigation_id, alert_id, review_reason))
-        print(f"[DB] Review saved for {investigation_id}")
+        logger.info(f"Review saved for {investigation_id}")
         return True
     except Exception as e:
-        print(f"[DB] Error saving review: {e}")
+        logger.error(f"Error saving review: {e}")
         return False
+
+
+def get_reviews():
+    """Get all review requests, with verdict/risk context from their investigation"""
+    try:
+        with closing(_connect()) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT rv.review_id, rv.investigation_id, rv.alert_id, rv.review_reason, rv.reviewed_at,
+                   i.alert_type, i.verdict, i.confidence, i.risk_score
+            FROM reviews rv
+            LEFT JOIN investigations i ON rv.investigation_id = i.investigation_id
+            ORDER BY rv.reviewed_at DESC
+            ''')
+            rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error retrieving reviews: {e}")
+        return []
 
 
 def save_resolved(investigation_id, alert_id, resolution_reason):
@@ -304,11 +339,30 @@ def save_resolved(investigation_id, alert_id, resolution_reason):
             INSERT INTO resolved (investigation_id, alert_id, resolution_reason)
             VALUES (?, ?, ?)
             ''', (investigation_id, alert_id, resolution_reason))
-        print(f"[DB] Incident marked as resolved: {investigation_id}")
+        logger.info(f"Incident marked as resolved: {investigation_id}")
         return True
     except Exception as e:
-        print(f"[DB] Error saving resolved: {e}")
+        logger.error(f"Error saving resolved: {e}")
         return False
+
+
+def get_resolved():
+    """Get all resolved incidents, with verdict/risk context from their investigation"""
+    try:
+        with closing(_connect()) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+            SELECT r.resolved_id, r.investigation_id, r.alert_id, r.resolution_reason, r.resolved_at,
+                   i.alert_type, i.verdict, i.confidence, i.risk_score
+            FROM resolved r
+            LEFT JOIN investigations i ON r.investigation_id = i.investigation_id
+            ORDER BY r.resolved_at DESC
+            ''')
+            rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Error retrieving resolved incidents: {e}")
+        return []
 
 
 def get_metrics():
@@ -344,5 +398,5 @@ def get_metrics():
             'resolved': resolved
         }
     except Exception as e:
-        print(f"[DB] Error retrieving metrics: {e}")
+        logger.error(f"Error retrieving metrics: {e}")
         return {'total_alerts': 0, 'escalations': 0, 'true_positives': 0, 'false_positives': 0, 'inconclusive': 0, 'resolved': 0}

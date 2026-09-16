@@ -68,6 +68,7 @@ body {
 /* Tabs */
 .tabs {
     display: flex;
+    flex-wrap: wrap;
     gap: 0;
     margin-bottom: 30px;
     border-bottom: 2px solid var(--border-color);
@@ -189,7 +190,10 @@ body {
     margin-bottom: 20px;
     min-height: 60px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 6px;
 }
 
 .status-box.pending {
@@ -202,6 +206,27 @@ body {
 
 .status-box p {
     font-size: 14px;
+}
+
+.status-box ul,
+.modal-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    font-size: 13px;
+    color: #aaa;
+}
+
+.status-box ul li,
+.modal-section ul li {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.status-box ul li:last-child,
+.modal-section ul li:last-child {
+    border-bottom: none;
 }
 
 /* Results Section */

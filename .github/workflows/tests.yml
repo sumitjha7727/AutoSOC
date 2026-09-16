@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Smoke-test app import
+        run: python -c "import web.app"
+
+      - name: Run test suite
+        run: |
+          python test_complete_system.py
+          python test_evidence_gatherer.py
+          python test_verdict_analyzer.py
+          python test_investigation_agent.py
+          python test_health_monitor.py
+          python test_orchestrator.py
