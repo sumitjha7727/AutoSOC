@@ -125,6 +125,17 @@ Open http://127.0.0.1:5000, pick an alert from the dropdown, and click **Start I
 the agent pipeline runs in the background and streams live progress to the page, ending with
 the verdict, full evidence trail, and timeline.
 
+### Dashboard tabs
+
+- **Dashboard** — pick an alert, start an investigation, watch it stream live, see the result.
+- **Investigations** — full history, searchable by ID; click **View** on any row to reopen its
+  details modal (evidence, reasoning, timeline, and the Escalate / Mark Resolved / Request
+  Review actions).
+- **Escalations** — every escalated incident, automatic or manual, with verdict/risk/confidence.
+- **Resolved** — every incident marked resolved, with the verdict/alert type it was resolved from.
+- **Reviews** — every incident flagged for manual review, same context.
+- **Metrics** — live counts: total alerts, true/false positives, inconclusive, escalations.
+
 ## Running the tests
 
 ```bash
