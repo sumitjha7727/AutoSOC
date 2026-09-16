@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  soc-automation:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: soc-automation
+    ports:
+      - "5000:5000"
+    volumes:
+      - ../data:/app/data
+      - ../logs:/app/logs
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  data:
+  logs:

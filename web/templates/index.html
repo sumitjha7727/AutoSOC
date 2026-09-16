@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOC Alert Automation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>SOC Alert Automation</h1>
+            <p>Automated Alert Triage Investigation System</p>
+            <div class="system-status online">System: <strong>Online</strong></div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="tab-button" onclick="switchTab('investigations')">Investigations</button>
+            <button class="tab-button" onclick="switchTab('escalations')">Escalations</button>
+            <button class="tab-button" onclick="switchTab('metrics')">Metrics</button>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- TAB 1: DASHBOARD -->
+        <!-- ============================================ -->
+        <div id="dashboard" class="tab-content active">
+            <!-- Select Alert Section -->
+            <div class="section">
+                <h2>Select Alert to Investigate</h2>
+                <div class="alert-selector">
+                    <select id="alertDropdown" onchange="updateAlertInfo()">
+                        <option value="">-- Select Alert --</option>
+                    </select>
+                    <button class="btn" onclick="startInvestigation()">Start Investigation</button>
+                </div>
+            </div>
+
+            <!-- Investigation Status Section -->
+            <div class="section">
+                <h2>Investigation Status</h2>
+                <div id="statusBox" class="status-box pending">
+                    <p>No investigation in progress</p>
+                </div>
+            </div>
+
+            <!-- Investigation Results Section -->
+            <div class="section">
+                <h2>Investigation Results</h2>
+                <div id="resultsBox">
+                    <!-- Results will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- TAB 2: INVESTIGATIONS -->
+        <!-- ============================================ -->
+        <div id="investigations" class="tab-content">
+            <div class="section">
+                <h2>Investigation History</h2>
+                
+                <!-- Search Box -->
+                <div class="search-box">
+                    <input 
+                        type="text" 
+                        id="investigationSearch" 
+                        placeholder="Search by investigation ID..." 
+                        onkeyup="searchInvestigations()"
+                    >
+                </div>
+
+                <!-- Investigations Table -->
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Investigation ID</th>
+                                <th>Alert ID</th>
+                                <th>Alert Type</th>
+                                <th>User Email</th>
+                                <th>IP Address</th>
+                                <th>Status</th>
+                                <th>Verdict</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="investigationsTable">
+                            <tr>
+                                <td colspan="8" style="text-align: center; color: #999;">Loading investigations...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- TAB 3: ESCALATIONS -->
+        <!-- ============================================ -->
+        <div id="escalations" class="tab-content">
+            <div class="section">
+                <h2>Escalated Incidents</h2>
+
+                <!-- Escalations Table -->
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Investigation ID</th>
+                                <th>Alert ID</th>
+                                <th>Verdict</th>
+                                <th>Confidence</th>
+                                <th>Risk Score</th>
+                                <th>Escalated At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="escalationsTable">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: #999;">Loading escalations...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- TAB 4: METRICS -->
+        <!-- ============================================ -->
+        <div id="metrics" class="tab-content">
+            <div class="section">
+                <h2>Dashboard Metrics</h2>
+
+                <!-- Metrics Cards -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h3>Total Alerts</h3>
+                        <div class="value" id="metricTotalAlerts">-</div>
+                    </div>
+                    <div class="metric-card resolved">
+                        <h3>True Positives</h3>
+                        <div class="value" id="metricTruePositives">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>False Positives</h3>
+                        <div class="value" id="metricFalsePositives">-</div>
+                    </div>
+                    <div class="metric-card escalations">
+                        <h3>Escalations</h3>
+                        <div class="value" id="metricEscalations">-</div>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Inconclusive</h3>
+                        <div class="value" id="metricInconclusive">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- MODAL: Investigation Details -->
+    <!-- ============================================ -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <!-- Modal Header with Close Button -->
+            <div class="modal-header">
+                <h2>Investigation Details</h2>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+
+            <!-- Investigation Details Section -->
+            <div class="modal-section">
+                <h3>Investigation Details</h3>
+                <p><strong>Investigation ID:</strong> <span id="modalInvestigationId">-</span></p>
+                <p><strong>Alert ID:</strong> <span id="modalAlertId">-</span></p>
+                <p><strong>Type:</strong> <span id="modalAlertType">-</span></p>
+                <p><strong>User:</strong> <span id="modalUserEmail">-</span></p>
+                <p><strong>IP:</strong> <span id="modalIpAddress">-</span></p>
+            </div>
+
+            <!-- Verdict Section -->
+            <div class="modal-section">
+                <h3>Verdict</h3>
+                <p><strong>Verdict:</strong> <span id="modalVerdict">-</span></p>
+                <p><strong>Confidence:</strong> <span id="modalConfidence">-</span>%</p>
+                <p><strong>Risk Score:</strong> <span id="modalRiskScore">-</span>/10.0</p>
+                <p><strong>Reasoning:</strong> <span id="modalReasoning">-</span></p>
+            </div>
+
+            <!-- Evidence Section (populated dynamically) -->
+            <div class="modal-section">
+                <h3>Evidence</h3>
+                <div id="modalEvidenceContainer"></div>
+            </div>
+
+            <!-- Timeline Section (populated dynamically) -->
+            <div class="modal-section">
+                <h3>Investigation Timeline</h3>
+                <ul id="modalTimeline"></ul>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="modal-buttons">
+                <button class="escalate" onclick="escalateIncident()">Escalate</button>
+                <button class="resolve" onclick="markResolved()">Mark Resolved</button>
+                <button class="review" onclick="requestReview()">Request Review</button>
+                <button class="close-btn" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

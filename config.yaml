@@ -1,0 +1,112 @@
+# ========================================
+# SOC Automation - Configuration File
+# ========================================
+
+# Application Settings
+app:
+  name: "SOC Alert Automation System"
+  version: "1.0.0"
+  environment: "development"
+  debug: true
+  host: "127.0.0.1"
+  port: 5000
+
+# Database Settings
+database:
+  type: "sqlite"
+  path: "./data/soc_automation.db"
+  timeout: 30
+  check_same_thread: false
+
+# Logging Settings
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./logs/soc_automation.log"
+  max_size_mb: 10
+  backup_count: 5
+
+# Mock Mode Settings
+mock_mode:
+  enabled: true
+  use_mock_claude: true
+  use_mock_apis: true
+  use_mock_emails: true
+  use_mock_databases: true
+
+# Agent Settings
+agents:
+  orchestrator:
+    name: "Orchestrator Agent"
+    timeout: 60
+    retry_attempts: 3
+  evidence_gatherer:
+    name: "Evidence Gatherer Agent"
+    timeout: 45
+    retry_attempts: 2
+    parallel_queries: 5
+  verdict_analyzer:
+    name: "Verdict Analyzer Agent"
+    timeout: 30
+    retry_attempts: 2
+  investigator:
+    name: "Investigation Agent"
+    timeout: 120
+    retry_attempts: 1
+    email_timeout: 3600
+  health_monitor:
+    name: "Health Monitor Agent"
+    timeout: 10
+    check_interval: 5
+
+# Data Paths
+data:
+  alerts_file: "./data/mock_alerts.json"
+  ip_verdicts_file: "./data/mock_ip_verdicts.json"
+  user_baseline_file: "./data/mock_user_baseline.json"
+  database_path: "./data/soc_automation.db"
+
+# API Settings (Mock)
+apis:
+  ip_reputation:
+    provider: "mock_virusTotal"
+    timeout: 10
+    enabled: true
+  geolocation:
+    provider: "mock_geoip"
+    timeout: 10
+    enabled: true
+  email:
+    provider: "mock_smtp"
+    timeout: 30
+    enabled: true
+
+# Verdict Thresholds
+verdict:
+  high_risk_score: 7.0
+  medium_risk_score: 4.0
+  low_risk_score: 1.0
+  confidence_threshold: 0.75
+  true_positive_threshold: 0.80
+
+# Stakeholder Contact Settings
+stakeholder:
+  email_templates_enabled: true
+  response_timeout_minutes: 60
+  retry_attempts: 2
+
+# Dashboard Settings
+dashboard:
+  enable_real_time_updates: true
+  websocket_enabled: true
+  max_alerts_display: 50
+  refresh_interval_seconds: 5
+  chart_data_points: 100
+
+# Feature Flags
+features:
+  parallel_agent_execution: true
+  async_email_handling: true
+  real_time_dashboard: true
+  detailed_logging: true
+  agent_health_monitoring: true

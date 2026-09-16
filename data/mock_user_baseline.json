@@ -1,0 +1,43 @@
+{
+  "john.doe@company.com": {
+    "department": "Engineering",
+    "typical_login_locations": [
+      "San Francisco"
+    ],
+    "never_accessed_from_countries": [
+      "China"
+    ]
+  },
+  "jane.smith@company.com": {
+    "department": "Security",
+    "typical_login_locations": [
+      "New York"
+    ],
+    "never_accessed_from_countries": [
+      "Russia"
+    ]
+  },
+  "mike.johnson@company.com": {
+    "department": "Operations",
+    "typical_login_locations": [
+      "Chicago"
+    ],
+    "never_accessed_from_countries": []
+  },
+  "admin@company.com": {
+    "department": "IT",
+    "typical_login_locations": [
+      "Headquarters"
+    ],
+    "never_accessed_from_countries": [
+      "China"
+    ]
+  },
+  "sarah.wilson@company.com": {
+    "department": "HR",
+    "typical_login_locations": [
+      "Headquarters"
+    ],
+    "never_accessed_from_countries": []
+  }
+}

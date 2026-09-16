@@ -1,0 +1,27 @@
+{
+  "202.91.87.45": {
+    "threat_level": "HIGH",
+    "reputation_score": 75,
+    "abuse_reports": 5
+  },
+  "192.168.1.105": {
+    "threat_level": "CRITICAL",
+    "reputation_score": 90,
+    "abuse_reports": 15
+  },
+  "10.0.1.50": {
+    "threat_level": "MEDIUM",
+    "reputation_score": 45,
+    "abuse_reports": 2
+  },
+  "172.16.0.25": {
+    "threat_level": "HIGH",
+    "reputation_score": 60,
+    "abuse_reports": 8
+  },
+  "203.0.113.45": {
+    "threat_level": "LOW",
+    "reputation_score": 15,
+    "abuse_reports": 0
+  }
+}
